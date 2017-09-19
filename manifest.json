@@ -80,7 +80,6 @@
       "19": "assets/icon19.png",
       "48": "assets/icon48.png"
    },
-   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1VtB6075FEgL7ORPBwcfR2hXhOXZ92Wg/s87+Odt4ix+NSzKTcnZ9/ln6YIV7sVO/7B8kkL1j5zFUpUGrxTv/+dhs9Vprz1iziulktdLhPHpwoRE8PgmSz5sItmqsArNFEFm4zEkZRjNgZaIG0bL/5BmkE2CjAPUjhYBiVQyFPYaFjGjd077ZMkbmiVCVdyk+8GiUjOlroX6cE9jO04CZW+VikuAU5jLoNzd50WOHDVeMQoukFUtVAIYv1IWvbUYfaseo8t/Z47jF2KivXoggAXFrV/uJiTvMot13XstxpR5yG8xnmZHnh42Q6nY7Ke/HYzTYnB9ftftAFpMBVAj6wIDAQAB",
    "manifest_version": 2,
    "name": "Steam Inventory Helper",
    "options_page": "html/popup.html",
