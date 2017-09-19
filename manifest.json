@@ -86,7 +86,7 @@
    "options_page": "html/popup.html",
    "permissions": [ "notifications", "alarms", "storage", "background", "webRequest", "webRequestBlocking", "*://steamcommunity.com/*", "*://*.steampowered.com/*", "http://*.steamstatic.com/*", "*://steamrep.com/*", "*://steamcdn-a.akamaihd.net/*" ],
    "short_name": "SIH",
-   "update_url": "https://clients2.google.com/service/update2/crx",
+   "update_url": "https://localhost",
    "version": "1.11.4.2",
    "web_accessible_resources": [ "_locales/*", "bundle/*", "assets/*", "font/*", "html/bookmarks.html", "css/*.css", "js/*.js", "js/jquery/*.js", "js/lang/*" ]
 }
