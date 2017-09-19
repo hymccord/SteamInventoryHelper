@@ -1,0 +1,89 @@
+﻿.profile-info {
+  display: none;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  float: left;
+  width: 500px;
+  padding: 5px;
+  margin-bottom: 5px;
+  margin-right: 10px;
+}
+
+.btn-hide {
+  position: absolute;
+  top: 15px;
+  right: 30px;
+}
+
+.ban-info {
+  display: none;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  float: left;
+  width: 300px;
+  padding: 5px;
+  margin-bottom: 5px;
+}
+
+.inventory-info {
+  display: none;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  float: left;
+  width: 300px;
+  padding: 5px;
+  margin-bottom: 5px;
+}
+
+.ban-info.caution {
+  border-color: #b6ff00;
+}
+
+.ban-info.warning {
+  border-color: #f00;
+}
+
+.ban-icon {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 16px;
+  border: solid #9b9b9b 2px;
+  height: 28px;
+  width: 28px;
+  line-height: 28px;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: default;
+}
+
+.ban-icon.trade,
+.ban-icon.community {
+  font-size: 16px;
+}
+
+.ban-icon.vac,
+.ban-icon.trade {
+  border-color: #f00;
+  color: #f00;
+}
+
+.rep {
+  clear: both;
+  display: none;
+}
+
+.rep::after {
+  content: '';
+  clear: both;
+  height: 0;
+  display: block;
+}
+
+.rep .caps {
+  text-transform: capitalize;
+}
+
+.rep strong {
+  color: #fff;
+}

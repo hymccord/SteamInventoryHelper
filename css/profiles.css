@@ -1,0 +1,42 @@
+﻿.sih-badge {
+    top: 5px;
+    right: 5px;
+    display: block;
+    position: absolute;
+}
+
+.sih-badge.dev {
+    background: url(../assets/badge_dev.png) no-repeat;
+    background-size: cover;
+    height: 120px;
+    width: 120px;
+}
+
+.sih-badge.don1 {
+    background: url(../assets/badge_don1.png) no-repeat;
+    background-size: cover;
+    top: 10px;
+    height: 40px;
+    width: 40px;
+}
+
+.sih-badge.don2 {
+    background: url(../assets/badge_don1.png) no-repeat;
+    background-size: cover;
+    top: 0;
+    height: 60px;
+    width: 60px;
+}
+
+.rep-status img {
+  height: 50px;
+  width: 50px;
+}
+
+.permalink {
+  padding-top: 15px;
+}
+
+.permalink a {
+  font-weight: 700;
+}

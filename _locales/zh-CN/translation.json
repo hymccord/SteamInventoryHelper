@@ -1,0 +1,49 @@
+﻿{
+  "langcode": "zh",
+  "about": {
+    "title": "关于"
+  },
+  "bookmarks": {
+    "title": "Bookmarks"
+  },
+  "faq": {
+    "title": "帮助"
+  },
+  "settings": {
+    "title": "设置",
+    "inventory": {
+      "buyset": "购买套装按钮",
+      "listdelay": "列表延迟",
+      "quicksell": "快速出售按钮",
+      "quickselldif": "快速出售差值",
+      "simpify": "简化 UI"
+    },
+    "listingmarket": {
+      "highlight": "价格过高时高亮显示",
+      "totalrow": "总行数",
+      "no_history": "历史页面大小",
+      "no_listings": "列表显示数量",
+      "quickbuy": "快速购买按钮"
+    },
+    "tradeoffer": {
+      "autodecline": "拒绝无效报价",
+      "offerdelay": "检查报价价格延迟",
+      "autocheckofferprice": "报价时自动获取价格",
+      "custombuttons": "自定义按钮"
+    },
+    "friends": {
+      "blockinvites": "屏蔽以下邀请",
+      "ignoreinvites": "忽略以下邀请"
+    },
+    "general": {
+      "currency": "货币",
+      "displaynof": "显示通知",
+      "language": "语言",
+      "nofsound": "通知声音",
+      "nofsound_vol": "音量",
+      "showsteamrep": "邀请页显示Steam信用评论"
+    },
+    "autoreply": "自动回复",
+    "note": "你需要刷新当前页面使更改生效"
+  }
+}

@@ -1,0 +1,16 @@
+.select-checkbox {
+    float: right;
+    margin-right: 8px;
+    margin-top: 8px;
+    position: absolute;
+    right: 0;
+}
+
+#Txt_Filter {
+    width: 300px;
+}
+
+.market_listing_right_cell.market_listing_edit_buttons,
+.market_listing_cancel_button {
+    position: relative;
+}

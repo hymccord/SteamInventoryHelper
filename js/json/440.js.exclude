@@ -1,0 +1,16 @@
+var tmp = {
+	"success": true,
+	"facets": {
+		"440_Class": {
+			"appid": 440, "name": "Class",
+			"localized_name": "Class", "tags": { "Pyro": { "localized_name": "Pyro", "matches": "53,064" }, "Sniper": { "localized_name": "Sniper", "matches": "49,402" }, "Soldier": { "localized_name": "Soldier", "matches": "49,225" }, "Heavy": { "localized_name": "Heavy", "matches": "48,342" }, "Demoman": { "localized_name": "Demoman", "matches": "45,595" }, "Scout": { "localized_name": "Scout", "matches": "44,881" }, "Medic": { "localized_name": "Medic", "matches": "42,973" }, "Spy": { "localized_name": "Spy", "matches": "41,999" }, "Engineer": { "localized_name": "Engineer", "matches": "36,687" } }
+		},
+		"440_Quality": {
+			"appid": 440, "name": "Quality", "localized_name": "Quality",
+			"tags": {
+				"Unique": { "color": "7D6D00", "localized_name": "Unique", "matches": "2,451,425" },
+				"vintage": { "color": "476291", "localized_name": "Vintage", "matches": "82,281" }, "strange": { "color": "CF6A32", "localized_name": "Strange", "matches": "52,105" }, "rarity1": { "color": "4D7455", "localized_name": "Genuine", "matches": "29,994" }, "haunted": { "color": "38f3ab", "localized_name": "Haunted", "matches": "7,906" }, "rarity4": { "color": "8650AC", "localized_name": "Unusual", "matches": "4,336" }, "collectors": { "color": "AA0000", "localized_name": "Collector's", "matches": "968" }
+			}
+		}, "440_Type": { "appid": 440, "name": "Type", "localized_name": "Type", "tags": { "Supply Crate": { "localized_name": "Crate", "matches": "2,281,951" }, "misc": { "localized_name": "Cosmetic", "matches": "54,649" }, "TF_ItemDynamicRecipeTool": { "localized_name": "Recipe", "matches": "51,885" }, "melee": { "localized_name": "Melee weapon", "matches": "48,748" }, "secondary": { "localized_name": "Secondary weapon", "matches": "40,941" }, "primary": { "localized_name": "Primary weapon", "matches": "38,569" }, "Craft Item": { "localized_name": "Craft Item", "matches": "35,462" }, "TF_T": { "localized_name": "Tool", "matches": "31,253" }, "TF_ServerEnchantmentType": { "localized_name": "Server Enchantment", "matches": "10,305" }, "TF_LockedCrate": { "localized_name": "Supply Crate", "matches": "7,745" }, "TF_KillStreakifierToolA": { "localized_name": "Killstreak Kit", "matches": "5,707" }, "TF_StrangePart": { "localized_name": "Strange Part", "matches": "5,213" }, "pda2": { "localized_name": "Secondary PDA", "matches": "4,236" }, "TF_Gift": { "localized_name": "Gift", "matches": "3,000" }, "TF_StrangifierTool": { "localized_name": "Strangifier", "matches": "2,610" }, "TF_KillStreakifierToolB": { "localized_name": "Specialized Killstreak Kit", "matches": "2,099" }, "TF_KillStreakifierToolC": { "localized_name": "Professional Killstreak Kit", "matches": "1,516" }, "TF_Package_Type": { "localized_name": "Package", "matches": "769" }, "building": { "localized_name": "Building", "matches": "553" }, "TF_StrangePartRestriction": { "localized_name": "Strange Filter", "matches": "397" }, "taunt": { "localized_name": "Taunt 1", "matches": "256" }, "TF_Party_Favor": { "localized_name": "Party Favor", "matches": "154" }, "action": { "localized_name": "Action", "matches": "59" }, "pda": { "localized_name": "Primary PDA", "matches": "14" } } }
+	}
+}

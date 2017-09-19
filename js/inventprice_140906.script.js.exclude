@@ -1,0 +1,1323 @@
+
+var lowestPriceWithFeeRegExp = /<span class="market_listing_price market_listing_price_with_fee">\s*(((?!Sold).)*?)\s*<\/span>/i;
+var lowestPriceWithoutFeeRegExp = /<span class="market_listing_price market_listing_price_without_fee">\s*(((?!Sold).)*?)\s*<\/span>/i;
+var insGemExp = /<span style="font-size: 18px; color: rgb\(255, 255, 255\)">(((?!:).)*?): \d+<\/span><br><span style="font-size: 12px">Inscribed Gem<\/span>/i;
+var kinGemExp = /<span style="font-size: 18px; color: rgb\(255, 255, 255\)">(((?!<).)*?)<\/span><br><span style="font-size: 12px">Kinetic Gem<\/span>/i;
+var priGemExp = /<span style="font-size: 18px; color: rgb\(\d+, \d+, \d+\)">(((?!<).)*?)<\/span><br><span style="font-size: 12px">Prismatic Gem<\/span>/i;
+var ethGemExp = /<span style="font-size: 18px; color: rgb\(255, 255, 255\)">(((?!<).)*?)<\/span><br><span style="font-size: 12px">Ethereal Gem<\/span>/i;
+var corGemExp = /<span style="font-size: 18px; color: rgb\(255, 255, 255\)">(((?!:).)*?): \d+<\/span><br><span style="font-size: 12px">Foulfell Shard<\/span>/i;
+var masGemExp = /<span style="font-size: 18px; color: rgb\(255, 255, 255\)">(((?!:).)*?): \d+<\/span><br><span style="font-size: 12px">Rune of the Duelist Indomitable<\/span>/i;
+var buyingExp = /javascript:BuyMarketListing\('listing', '(\d+)', (\d+), '(\d+)', '(\d+)'\)/;
+var cachePrices = {};
+var sellingStack = {};
+var selectmode = false;
+var currencyId = 1;
+var lastSelectedItem = null;
+var apiItems = {};
+var someIds = ['76561198090644557', 'abcdef', '76561198028005207'];
+var checkPrice = function () {
+    var currentIdx = $J('#iteminfo0').is(':visible') ? 0 : 1;
+    var name = $J('#iteminfo' + currentIdx + '_item_name').text();
+    getLowestPriceHandler();
+}
+
+var reloadDes = function () {
+    var sOldInfo = 'iteminfo' + iActiveSelectView;
+    var elDescriptors = $(sOldInfo + '_item_descriptors');
+    PopulateDescriptions(elDescriptors, g_ActiveInventory.selectedItem.descriptions);
+}
+
+var getSetLink = function (d, sItem, isGenuine) {
+    var itname = d.market_hash_name || d.value;
+    //if (itname.indexOf('The ') == 0) itname = itname.substring(4);
+    var setLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=' + (isGenuine ? 'Genuine%20' : '') + encodeURIComponent(itname);
+    d.setLink = setLink;
+    if (cachePrices[setLink] && cachePrices[setLink].lowestPrice) {
+        d.app_data.price = cachePrices[setLink].lowestPrice;
+        d.app_data.market_hash_name = cachePrices[setLink].market_hash_name;
+        d.app_data.owned = cachePrices[setLink].owned;
+
+        //d.value = '<a href="http://steamcommunity.com/market/listings/' + sItem.appid + "/" + cachePrices[setLink].market_hash_name + '" target="_blank" title="' + cachePrices[setLink].nofeePrice + '">' + d.value + ' (' + cachePrices[setLink].lowestPrice + ')</a>';
+        if (sItem === g_ActiveInventory.selectedItem)
+            reloadDes();
+        return;
+    }
+    else {
+        //if (itname.indexOf('The ') == 0) itname = itname.substring(4);
+        cachePrices[setLink] = { market_hash_name: (isGenuine ? 'Genuine ' : '') + itname };
+        //var owned = false;
+        var exp = new RegExp('.*' + cachePrices[setLink].market_hash_name.replace('The ', '(The )?') + '$');
+        //console.log(exp);
+        $J.each(g_ActiveInventory.rgInventory, function () {
+            if (exp.test(this.market_hash_name)) {
+                cachePrices[setLink].market_hash_name = this.market_hash_name;
+                cachePrices[setLink].owned = true;
+                return false;
+            }
+        });
+    }
+    $J.ajax({
+        method: "GET",
+        url: setLink,
+        success: function (response, textStatus, jqXHR) {
+            var lp = 0, nfp = 0;
+            if (response.success) {
+                if (response.median_price) {
+                    cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                    cachePrices[this.url].nofeePrice = nfp = response.median_price;
+                    if (sItem === g_ActiveInventory.selectedItem) {
+                        for (var k = 0; k < sItem.descriptions.length; k++) {
+                            var dd = sItem.descriptions[k];
+                            if (dd.setLink == this.url) {
+                                dd.app_data.price = cachePrices[this.url].lowestPrice;
+                                dd.app_data.market_hash_name = cachePrices[this.url].market_hash_name;
+                                dd.app_data.owned = cachePrices[this.url].owned;
+                                //dd.value = '<a href="http://steamcommunity.com/market/listings/' + sItem.appid + "/" + cachePrices[this.url].market_hash_name + '" target="_blank" title="' + cachePrices[this.url].nofeePrice + '">' + dd.value + ' (' + cachePrices[this.url].lowestPrice + ')</a>';
+                                break;
+                            }
+                        }
+                        reloadDes();
+                    }
+                }
+                else if (itname.indexOf('The ') == 0) {
+                    d.market_hash_name = itname.substring(4);
+                    getSetLink(d, sItem, isGenuine);
+                }
+            }
+            else if (itname.indexOf('The ') == 0) {
+                d.market_hash_name = itname.substring(4);
+                getSetLink(d, sItem, isGenuine);
+            }
+        },
+        error: function () {
+            if (itname.indexOf('The ') == 0) {
+                d.market_hash_name = itname.substring(4);
+                getSetLink(d, sItem, isGenuine);
+            }
+        }
+    });
+
+}
+
+var getLowestPriceHandler = function (gitem, callback) {
+    var sItem = gitem || g_ActiveInventory.selectedItem;
+    var theItemString = encodeURIComponent(name);
+    // from Steam's community market website
+    var appID = g_ActiveInventory.appid;
+    //var marketLink = sItem.appid + '/' + sItem.market_hash_name + '/';
+    $J('.dd_price').html("Loading...");
+    var isGenuine = false;
+    var itemLink = window.location.protocol + "//steamcommunity.com/market/priceoverview/?appid=" + sItem.appid + "&country=" + g_strCountryCode + "&currency=" + currencyId + "&market_hash_name=" + encodeURIComponent(sItem.market_hash_name);
+    var marketLink = window.location.protocol + "//steamcommunity.com/market/listings/" + sItem.appid + "/" + encodeURIComponent(sItem.market_hash_name);
+    if (cachePrices[itemLink] && cachePrices[itemLink].nofeePrice) {
+        sItem.nofeePrice = cachePrices[itemLink].nofeePrice;
+        sItem.lowestPrice = cachePrices[itemLink].lowestPrice;
+    }
+    else {
+        cachePrices[itemLink] = { market_hash_name: sItem.market_hash_name, owned: true };
+    }
+
+    $J.each(sItem.tags, function () {
+        //console.log((this.category == 'Quality' && this.internal_name == 'genuine'));
+        isGenuine = (isGenuine || (this.category == 'Quality' && this.internal_name == 'genuine'));
+        if (isGenuine) return false;
+    })
+    for (var i = 0; i < sItem.descriptions.length; i++) {
+        var d = sItem.descriptions[i];
+        if (d.type != 'html' && d.value.indexOf('Inscribed Gem') < 0 && d.value.indexOf('Kinetic Gem') < 0 && d.value.indexOf('Prismatic Gem') < 0 && d.value.indexOf('Ethereal Gem') < 0) continue;
+        if (d.app_data && !d.app_data.is_itemset_name && !d.app_data.price && !d.app_data.limited) {
+            getSetLink(d, sItem, isGenuine);
+        }
+
+        var ematch;
+        while (ematch = insGemExp.exec(d.value)) {
+            //console.log(ematch);
+            var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=Inscribed ' + ematch[1];
+            var nText = ematch[0].replace('<span style="font-size: 12px">Inscribed Gem</span>', '<a href="' + gemLink + '">Inscribed Gem (Loading)</a>');
+            if (cachePrices[gemLink] && cachePrices[gemLink].lowestPrice) {
+                d.value = d.value.replace('<span style="font-size: 12px">Inscribed Gem</span>', '<a href="' + gemLink + '" target="_blank" title="' + cachePrices[gemLink].nofeePrice + '">Inscribed Gem (' + cachePrices[gemLink].lowestPrice + ')</a>');
+                if (sItem === g_ActiveInventory.selectedItem)
+                    reloadDes();
+                continue;
+            }
+            d.value = d.value.replace(ematch[0], nText);
+            $J.ajax({
+                method: "GET",
+                url: gemLink,
+                success: function (response, textStatus, jqXHR) {
+                    var lp = 0, nfp = 0;
+                    if (response.success) {
+                        cachePrices[this.url] = new Object();
+                        cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                        cachePrices[this.url].nofeePrice = nfp = response.median_price;
+
+                        d.value = d.value.replace('<a href="' + this.url + '">Inscribed Gem (Loading)</a>', '<a href="' + this.url + '" target="_blank" title="' + nfp + '">Inscribed Gem (' + lp + ')</a>');
+
+                        if (sItem === g_ActiveInventory.selectedItem)
+                            reloadDes();
+                    }
+                    else
+                        d.value = d.value.replace('<a href="' + this.url + '">Inscribed Gem (Loading)</a>', '<span style="font-size: 12px">Inscribed Gem</span>');
+
+
+                },
+                error: function () {
+                    d.value = d.value.replace('<a href="' + this.url + '">Inscribed Gem (Loading)</a>', '<span style="font-size: 12px">Inscribed Gem</span>');
+                }
+            });
+        }
+
+        while (ematch = kinGemExp.exec(d.value)) {
+            //console.log(ematch);
+            var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=Kinetic: ' + ematch[1];
+            var nText = ematch[0].replace('<span style="font-size: 12px">Kinetic Gem</span>', '<a href="' + gemLink + '">Kinetic Gem (Loading)</a>');
+            d.value = d.value.replace(ematch[0], nText);
+            $J.ajax({
+                method: "GET",
+                url: gemLink,
+                success: function (response, textStatus, jqXHR) {
+                    var lp = 0, nfp = 0;
+                    if (response.success) {
+                        cachePrices[this.url] = new Object();
+                        cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                        cachePrices[this.url].nofeePrice = nfp = response.median_price;
+
+                        d.value = d.value.replace('<a href="' + this.url + '">Kinetic Gem (Loading)</a>', '<a href="' + this.url + '" target="_blank" title="' + nfp + '">Kinetic Gem (' + lp + ')</a>');
+
+                        if (sItem === g_ActiveInventory.selectedItem)
+                            reloadDes();
+                    }
+                    else
+                        d.value = d.value.replace('<a href="' + this.url + '">Kinetic Gem (Loading)</a>', '<span style="font-size: 12px">Kinetic Gem</span>');
+                },
+                error: function () {
+                    d.value = d.value.replace('<a href="' + this.url + '">Kinetic Gem (Loading)</a>', '<span style="font-size: 12px">Kinetic Gem</span>');
+                }
+            });
+        }
+
+        while (ematch = masGemExp.exec(d.value)) {
+            //console.log(ematch);
+            var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=Rune%20of%20the%20Duelist%20Indomitable';
+            var nText = ematch[0].replace('<span style="font-size: 12px">Rune of the Duelist Indomitable</span>', '<a href="' + gemLink + '">Rune of the Duelist Indomitable (Loading)</a>');
+            d.value = d.value.replace(ematch[0], nText);
+            $J.ajax({
+                method: "GET",
+                url: gemLink,
+                success: function (response, textStatus, jqXHR) {
+                    var lp = 0, nfp = 0;
+                    if (response.success) {
+                        cachePrices[this.url] = new Object();
+                        cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                        cachePrices[this.url].nofeePrice = nfp = response.median_price;
+
+                        d.value = d.value.replace('<a href="' + this.url + '">Rune of the Duelist Indomitable (Loading)</a>', '<a href="' + this.url + '" target="_blank" title="' + nfp + '">Rune of the Duelist Indomitable (' + lp + ')</a>');
+
+                        if (sItem === g_ActiveInventory.selectedItem)
+                            reloadDes();
+                    }
+                    else
+                        d.value = d.value.replace('<a href="' + this.url + '">Rune of the Duelist Indomitable (Loading)</a>', '<span style="font-size: 12px">Rune of the Duelist Indomitable</span>');
+                },
+                error: function () {
+                    d.value = d.value.replace('<a href="' + this.url + '">Rune of the Duelist Indomitable (Loading)</a>', '<span style="font-size: 12px">Rune of the Duelist Indomitable</span>');
+                }
+            });
+        }
+
+        while (ematch = corGemExp.exec(d.value)) {
+            //console.log(ematch);
+            var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=Foulfell Shard';
+            var nText = ematch[0].replace('<span style="font-size: 12px">Foulfell Shard</span>', '<a href="' + gemLink + '">Foulfell Shard (Loading)</a>');
+            d.value = d.value.replace(ematch[0], nText);
+            $J.ajax({
+                method: "GET",
+                url: gemLink,
+                success: function (response, textStatus, jqXHR) {
+                    var lp = 0, nfp = 0;
+                    if (response.success) {
+                        cachePrices[this.url] = new Object();
+                        cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                        cachePrices[this.url].nofeePrice = nfp = response.median_price;
+
+                        d.value = d.value.replace('<a href="' + this.url + '">Foulfell Shard (Loading)</a>', '<a href="' + this.url + '" target="_blank" title="' + nfp + '">Foulfell Shard (' + lp + ')</a>');
+
+                        if (sItem === g_ActiveInventory.selectedItem)
+                            reloadDes();
+                    }
+                    else
+                        d.value = d.value.replace('<a href="' + this.url + '">Foulfell Shard (Loading)</a>', '<span style="font-size: 12px">Foulfell Shard</span>');
+                },
+                error: function () {
+                    d.value = d.value.replace('<a href="' + this.url + '">Foulfell Shard (Loading)</a>', '<span style="font-size: 12px">Foulfell Shard</span>');
+                }
+            });
+        }
+
+        while (ematch = ethGemExp.exec(d.value)) {
+            //console.log(ematch);
+            var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=Ethereal: ' + ematch[1];
+            var nText = ematch[0].replace('<span style="font-size: 12px">Ethereal Gem</span>', '<a href="' + gemLink + '">Ethereal Gem (Loading)</a>');
+            d.value = d.value.replace(ematch[0], nText);
+            $J.ajax({
+                method: "GET",
+                url: gemLink,
+                success: function (response, textStatus, jqXHR) {
+                    var lp = 0, nfp = 0;
+                    if (response.success) {
+                        cachePrices[this.url] = new Object();
+                        cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                        cachePrices[this.url].nofeePrice = nfp = response.median_price;
+
+                        d.value = d.value.replace('<a href="' + this.url + '">Ethereal Gem (Loading)</a>', '<a href="' + this.url + '" target="_blank" title="' + nfp + '">Ethereal Gem (' + lp + ')</a>');
+
+                        if (sItem === g_ActiveInventory.selectedItem)
+                            reloadDes();
+                    }
+                    else
+                        d.value = d.value.replace('<a href="' + this.url + '">Ethereal Gem (Loading)</a>', '<span style="font-size: 12px">Ethereal Gem</span>');
+                },
+                error: function () {
+                    d.value = d.value.replace('<a href="' + this.url + '">Ethereal Gem (Loading)</a>', '<span style="font-size: 12px">Ethereal Gem</span>');
+                }
+            });
+        }
+
+        while (ematch = priGemExp.exec(d.value)) {
+            //console.log(ematch);
+            var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + currencyId + '&market_hash_name=Prismatic: ' + ematch[1];
+            var nText = ematch[0].replace('<span style="font-size: 12px">Prismatic Gem</span>', '<a href="' + gemLink + '">Prismatic Gem (Loading)</a>');
+            d.value = d.value.replace(ematch[0], nText);
+            $J.ajax({
+                method: "GET",
+                url: gemLink,
+                success: function (response, textStatus, jqXHR) {
+
+                    var lp = 0, nfp = 0;
+                    if (response.success) {
+                        cachePrices[this.url] = new Object();
+                        cachePrices[this.url].lowestPrice = lp = response.lowest_price;
+                        cachePrices[this.url].nofeePrice = nfp = response.median_price;
+
+                        d.value = d.value.replace('<a href="' + this.url + '">Prismatic Gem (Loading)</a>', '<a href="' + this.url + '" target="_blank" title="' + nfp + '">Prismatic Gem (' + lp + ')</a>');
+
+                        if (sItem === g_ActiveInventory.selectedItem)
+                            reloadDes();
+                    }
+                    else
+                        d.value = d.value.replace('<a href="' + this.url + '">Prismatic Gem (Loading)</a>', '<span style="font-size: 12px">Prismatic Gem</span>');
+                },
+                error: function () {
+                    d.value = d.value.replace('<a href="' + this.url + '">Ethereal Gem (Loading)</a>', '<span style="font-size: 12px">Ethereal Gem</span>');
+                }
+            });
+        }
+    }
+
+    if (sItem.lowestPrice) {
+        $J('.dd_price').html("<a href='#' target='_blank' title='" + sItem.nofeePrice + "'>" + sItem.lowestPrice + "</a>");
+        $J('.dd_price').find('a').attr('href', marketLink);
+        if (callback)
+            callback(sItem);
+        return;
+    }
+
+    if (!sItem.marketable) {
+        $J('.dd_price').html("Not Marketable");
+        if (callback)
+            callback(sItem);
+        return;
+    }
+
+    $J.ajax({
+        method: "GET",
+        url: itemLink,
+        success: function (response) {
+            if (response.success) {
+                //cachePrices[itemLink] = new Object();
+                cachePrices[itemLink].lowestPrice = sItem.lowestPrice = response.lowest_price;
+                cachePrices[itemLink].nofeePrice = sItem.nofeePrice = response.median_price;
+                //cachePrices[itemLink].market_hash_name = sItem.market_hash_name;
+
+                if (sItem === g_ActiveInventory.selectedItem) {
+                    if (sItem.lowestPrice)
+                        $J('.dd_price').html("<a href='#' target='_blank' title='" + sItem.nofeePrice + "'>" + sItem.lowestPrice + "</a>");
+                    else
+                        $J('.dd_price').html("<a href='#' target='_blank' title='Can not get price'>Can't get price</a>");
+
+                    $J('.dd_price').find('a').attr('href', marketLink);
+                }
+
+                if (callback)
+                    callback(sItem);
+            }
+        }
+    });
+
+}
+
+var setGemPrice = function (sItem, gemName, gemType, callback) {
+    var gemLink = window.location.protocol + '//steamcommunity.com/market/priceoverview/?appid=570&country=VN&currency=1&market_hash_name=' + gemName;
+    $J.ajax({
+        method: "GET",
+        url: gemLink,
+        success: function (response, textStatus, jqXHR) {
+            var lp = 0, nfp = 0;
+            if (response.success) {
+                lp = response.lowest_price;
+                var pp = /([\d\.,]+)/.exec(lp.replace(/\&#\d+;/g, '').replace(' p&#1091;&#1073;.', '').replace(/,/g, '.'))[1];
+                sItem.extimatePrice[gemName] = pp;
+                callback(sItem);
+            }
+        },
+        error: function () {
+        }
+    });
+}
+
+var ShowQueue = function () {
+    $J('div.queue-container').remove();
+    var selectedItems = $J('.selectedSell');
+    var div = $J('<div class="queue-container">');
+    div.append('<div class="queue-item-count" >' + selectedItems.length + '</div>')
+    div.append('<div class="queue-total-price" ><span class="with-fee" title="Total buyer will pay"></span><span class="without-fee" title="Total will recieve"></span></div>');
+    var cdiv = $J('<div class="scrollbar-inner">');
+    div.append(cdiv);
+    selectedItems.each(function () {
+        var rgItem = this.rgItem;
+        var container = $J('<div class="queue-item-container" data-id="' + rgItem.id + '">');
+        container.append('<a href="#" class="queue-item-remove" title="Remove from queue">&#x2212;</a>');
+        var item = $J('<div class="queue-item">');
+        item.css('border-color', '#' + rgItem.name_color)
+        item.append($J(this).find('img').clone());
+        container[0].rgItem = rgItem;
+        container.append(item);
+        AddItemHoverToElement(item[0], rgItem);
+        cdiv.append(container);
+    });
+    $J('body').append(div);
+    $J(cdiv).scrollbar();
+    console.log($J(div).outerHeight());
+    qTotalPrice = 0;
+    qTotalBuyerPrice = 0;
+    GetQueuePrice();
+}
+var qTimer = null;
+var qTotalPrice = 0;
+var qTotalBuyerPrice = 0;
+
+var GetQueuePrice = function () {
+    if (qTimer) window.clearTimeout(qTimer);
+    var it = $J('.queue-item-container:not(:has(>span.price))');
+    if (it.length > 0) {
+        var rgItem = it[0].rgItem;
+        getLowestPriceHandler(rgItem, function (item) {
+            if (item && item.lowestPrice) {
+                var num = item.lowestPrice.replace(/\&#\d+;/g, '').replace(' p&#1091;&#1073;.', '');
+                var inputValue = SellItemDialog.GetPriceValueAsInt(num);
+                var nAmount = inputValue;
+                var priceWithoutFee = null;
+                if (inputValue > 0 && nAmount == parseInt(nAmount)) {
+                    // Calculate what the seller gets
+                    var publisherFee = typeof SellItemDialog.m_item.market_fee != 'undefined' ? SellItemDialog.m_item.market_fee : g_rgWalletInfo['wallet_publisher_fee_percent_default'];
+                    var feeInfo = CalculateFeeAmount(nAmount, publisherFee);
+                    nAmount = nAmount - feeInfo.fees;
+
+                    priceWithoutFee = v_currencyformat(nAmount, GetCurrencyCode(g_rgWalletInfo['wallet_currency']));
+                }
+
+                var pp = $J('<span class="price"></span>');
+                pp.html(item.lowestPrice);
+                pp.attr('title', priceWithoutFee);
+
+                item.buyerPrice = inputValue;
+                item.sellerPrice = nAmount;
+                $J(it[0]).append(pp);
+                qTotalPrice += inputValue;
+                qTotalBuyerPrice += nAmount;
+                $J('.queue-total-price .with-fee').html(v_currencyformat(qTotalPrice, GetCurrencyCode(g_rgWalletInfo['wallet_currency'])));
+                $J('.queue-total-price .without-fee').html(v_currencyformat(qTotalBuyerPrice, GetCurrencyCode(g_rgWalletInfo['wallet_currency'])));
+            }
+            else {
+                var rgItemOrg = it[0].rgItem;
+                $J('#item' + rgItemOrg.appid + '_' + rgItemOrg.contextid + '_' + $J(it[0]).data().id + '.selectedSell').removeClass('selectedSell');
+
+                var itC = $J('.inventory_page .selectedSell').length;
+                if (itC <= 0) {
+                    SellItemDialog.Dismiss();
+                    $J('#Lnk_ShowSellMulti').hide();
+                    return false;
+                }
+
+                var rgItem1 = $J('.inventory_page .selectedSell')[0].rgItem;
+                g_ActiveInventory.SelectItem(null, rgItem1.element, rgItem1);
+                g_ActiveInventory.EnsurePageActiveForItem(rgItem1.element);
+                UpdateSellItem(rgItem1);
+                $J('.queue-item-count').html(itC);
+                $J('#Lnk_ShowSellMulti .item_market_action_button_contents').html('Sell ' + itC + ' item' + (itC > 1 ? 's' : ''));
+                $J(it[0]).remove();
+
+            }
+            window.setTimeout('GetQueuePrice();', 50);
+        });
+    }
+}
+
+var ModifyMarketActions = function () {
+    if (!window.fastdelta) window.fastdelta = -0.01;
+    if (!window.quicksellbuttons) window.quicksellbuttons = true;
+    if (!window.buysetbuttons) window.buysetbuttons = true;
+
+    PopulateMarketActions = function (elActions, item) {
+        elActions.update('');
+        if (!item.marketable || (item.is_currency && CurrencyIsWalletFunds(item))) {
+            elActions.hide();
+            return;
+        }
+        if (typeof (g_bViewingOwnProfile) != 'undefined' && g_bViewingOwnProfile) {
+            var strMarketName = typeof item.market_hash_name != 'undefined' ? item.market_hash_name : item.market_name;
+
+            var elPriceInfo = new Element('div');
+            var elPriceInfoHeader = new Element('div', { 'style': 'height: 24px;' });
+            var elMarketLink = new Element('a', {
+                'href': window.location.protocol + '//steamcommunity.com/market/listings/' + item.appid + '/' + strMarketName
+            });
+            elMarketLink.update('View in Community Market');
+            elPriceInfoHeader.appendChild(elMarketLink);
+            elPriceInfo.appendChild(elPriceInfoHeader);
+
+            var elPriceInfoContent = new Element('div', { 'style': 'min-height: 3em; margin-left: 1em;' });
+            elPriceInfoContent.update('<img src="' + window.location.protocol + '//steamcommunity-a.akamaihd.net/public/images/login/throbber.gif" alt="Working...">');
+            elPriceInfo.appendChild(elPriceInfoContent);
+
+            new Ajax.Request(window.location.protocol + '//steamcommunity.com/market/priceoverview/', {
+                method: 'get',
+                parameters: {
+                    country: g_strCountryCode,
+                    currency: typeof (g_rgWalletInfo) != 'undefined' ? g_rgWalletInfo['wallet_currency'] : 1,
+                    appid: item.appid,
+                    market_hash_name: strMarketName
+                },
+                onSuccess: function (transport) {
+                    if (transport.responseJSON && transport.responseJSON.success) {
+                        var strInfo = '';
+                        if (transport.responseJSON.lowest_price) {
+                            strInfo += 'Starting at: ' + transport.responseJSON.lowest_price + '<br>'
+
+                            var num = transport.responseJSON.lowest_price.replace(/\&#\d+;/g, '').replace(' p&#1091;&#1073;.', '');
+                            var inputValue = SellItemDialog.GetPriceValueAsInt(num);
+                            var nAmount = inputValue;
+                            var sellingPrice = null;
+                            if (inputValue > 0 && nAmount == parseInt(nAmount)) {
+                                // Calculate what the seller gets
+                                var publisherFee = typeof item.market_fee != 'undefined' ? item.market_fee : g_rgWalletInfo['wallet_publisher_fee_percent_default'];
+                                var feeInfo = CalculateFeeAmount(nAmount, publisherFee);
+                                nAmount = nAmount - feeInfo.fees + (100 * (window.fastdelta));
+                                if (nAmount <= 0) nAmount = 1;
+
+                                var info = CalculateAmountToSendForDesiredReceivedAmount(nAmount, publisherFee);
+                                inputValue = info.amount;
+                                sellingPrice = v_currencyformat(inputValue, GetCurrencyCode(g_rgWalletInfo['wallet_currency']));
+                            }
+
+                            if (quicksellbuttons) {
+                                var fastSellBt = CreateMarketActionButton('green', '#', 'Fast sell this at ' + sellingPrice);
+                                $J(fastSellBt).click(function () {
+                                    elPriceInfoContent.update('<img src="' + window.location.protocol + '//steamcommunity-a.akamaihd.net/public/images/login/throbber.gif" alt="Working...">');
+                                    SellItemDialog.m_item = item;
+                                    $J.ajax({
+                                        url: 'https://steamcommunity.com/market/sellitem/',
+                                        type: 'POST',
+                                        data: {
+                                            sessionid: g_sessionID,
+                                            appid: item.appid,
+                                            contextid: item.contextid,
+                                            assetid: item.id,
+                                            amount: 1,
+                                            price: nAmount
+                                        },
+                                        crossDomain: true,
+                                        xhrFields: { withCredentials: true }
+                                    }).done(function (data) {
+                                        SellItemDialog.OnSuccess({ responseJSON: data });
+                                        if ($J('#Ck_NoReload').is(':checked'))
+                                            PopulateMarketActions(elActions, item);
+                                    }).fail(function (jqxhr) {
+                                        // jquery doesn't parse json on fail
+                                        elPriceInfoContent.update('Error...');
+                                        var data = $J.parseJSON(jqxhr.responseText);
+                                        SellItemDialog.OnFailure({ responseJSON: data });
+                                    });
+                                    return false;
+                                });
+                                elActions.appendChild(fastSellBt);
+                            }
+                        }
+                        else {
+                            strInfo += 'There are no listings currently available for this item.' + '<br>';
+                        }
+
+                        if (transport.responseJSON.volume) {
+                            var strVolume = '%1$s sold in the last 24 hours';
+                            strVolume = strVolume.replace('%1$s', transport.responseJSON.volume);
+                            //strInfo += 'Median price: ' + transport.responseJSON.median_price + '<br>';
+                            strInfo += 'Volume: ' + strVolume + '<br>';
+                        }
+
+                        elPriceInfoContent.update(strInfo);
+                    }
+                },
+                onFailure: function (transport) { elPriceInfo.hide(); }
+            });
+
+            elActions.appendChild(elPriceInfo);
+
+            var elSellButton = CreateMarketActionButton('green', '#', 'Sell');
+            $J(elSellButton).click(function () {
+
+                if ($J('.selectedSell').length > 0) {
+                    $J('#div_multi input[type=checkbox]').prop('disabled', false);
+                    $J('#div_multi').show();
+                    $J('#ck_autoaccept').prop('checked', true);
+                    var rgItem = $J('.selectedSell')[0].rgItem;
+                    g_ActiveInventory.SelectItem(null, rgItem.element, rgItem);
+                    g_ActiveInventory.EnsurePageActiveForItem(rgItem.element);
+                    SellItemDialog.Show(rgItem);
+                    ShowQueue();
+                }
+                else {
+                    SellCurrentSelection();
+                }
+                return false;
+            });
+            elActions.appendChild(elSellButton);
+
+            if (!g_bMarketAllowed) {
+                var elTooltip = $('market_tip_noaccess');
+                InstallHoverTooltip(elSellButton, elTooltip);
+            }
+        }
+        else {
+            elActions.hide();
+            return;
+        }
+
+
+        elActions.show();
+    }
+
+}
+
+var ModifyDescriptionFunction = function () {
+    PopulateDescriptions = function (elDescriptions, rgDescriptions) {
+        elDescriptions.update('');
+        if (!rgDescriptions || !rgDescriptions.length) {
+            elDescriptions.hide();
+            return;
+        }
+
+        elDescriptions.show();
+        var setEl = null;
+        var setName = null;
+        var totalPrice = 0;
+        var missingParts = [];
+        for (var i = 0; i < rgDescriptions.length; i++) {
+            var description = rgDescriptions[i];
+            if (!description.value)
+                continue;
+
+            var elDescription = new Element('div', { 'class': 'descriptor' });
+            if (description.color)
+                elDescription.style.color = '#' + description.color;
+
+            // just use a blank space for an empty string
+            if (v_trim(description.value).length == 0) {
+                elDescription.update('&nbsp;');
+            }
+            else if (description.type == 'image') {
+                var elImage = new Element('img', { src: description.value });
+                elDescription.appendChild(elImage);
+            }
+            else {
+                description.value = description.value.replace(/\[date\](\d*)\[\/date\]/g, function (match, p1) {
+                    var date = new Date(p1 * 1000);
+                    return date.toLocaleString();
+                });
+
+                var html = description.value.replace(/\n/g, '<br>');
+                if (description.app_data && !description.app_data.limited) {
+                    var item = {};
+                    if (description.app_data.price) {
+                        var pp = /([\d\.,]+)/.exec(description.app_data.price.replace(/\&#\d+;/g, '').replace(' p&#1091;&#1073;.', '').replace(/,/g, '.'))[1];
+                        item.price = pp;
+                        item.link = window.location.protocol + '//steamcommunity.com/market/listings/' + g_ActiveInventory.appid + '/' + encodeURIComponent(description.app_data.market_hash_name);
+                        item.name = html;
+                        item.market_hash_name = description.app_data.market_hash_name;
+                        totalPrice += parseFloat(pp);
+                        html = '<a href="' + window.location.protocol + '//steamcommunity.com/market/listings/' + g_ActiveInventory.appid + '/' + encodeURIComponent(description.app_data.market_hash_name) + '" target="_blank" style="color:inherit" class="whiteLink">' + html + ' (' + pp + ')</a>';
+                    }
+
+                    if (description.app_data.owned) {
+                        html = '&#10003; ' + html;
+                    }
+                    else {
+                        html = '&#10007;&nbsp; ' + html;
+                        if (description.app_data.price)
+                            missingParts.push(item);
+                    }
+                }
+
+                elDescription.update(html);
+            }
+            if (description.app_data && description.app_data.is_itemset_name) {
+                setEl = elDescription;
+                setName = description.value;
+            }
+
+            if (description.label) {
+                var elLabel = new Element('span', { 'class': 'descriptor_label' });
+                elLabel.update(description.label + ': ');
+                elDescription.insert({ top: elLabel });
+            }
+
+
+            elDescriptions.appendChild(elDescription);
+        }
+        //console.log(totalPrice);
+        if (setEl) {
+            setEl.update(setName + ' (' + (Math.round(totalPrice * 100) / 100) + ')');
+            if (missingParts.length > 0 && g_bViewingOwnProfile && g_bMarketAllowed && buysetbuttons) {
+                var buySetBtn = $J('<a href="#" class="buy-set">Buy missing parts</a>');
+                buySetBtn.click(function () {
+                    BuySetDialog.Show(missingParts);
+                    return false;
+                });
+                $J(setEl).append('<br />').append(buySetBtn);
+            }
+        }
+
+    }
+}
+
+var ModifyItemDisplay = function () {
+    UserYou.OnLoadInventoryComplete = function (transport, appid, contextid) {
+        this.cLoadsInFlight--;
+        if (transport.responseJSON && transport.responseJSON.success) {
+            var inventory = new CInventory(this, appid, contextid, transport.responseJSON.rgInventory, transport.responseJSON.rgCurrency);
+
+            this.addInventory(inventory);
+            var elInventory = inventory.getInventoryElement();
+            elInventory.hide();
+            $('inventories').insert(elInventory);
+
+            var elTags = inventory.getTagContainer();
+            var elTagHolder = $('filter_options');
+            if (elTagHolder && elTags) {
+                elTags.hide();
+                elTagHolder.insert(elTags);
+                elTagHolder.addClassName('filter_collapsed');
+            }
+            if (appid == 570) {
+                $J.ajax({
+                    url: window.location.protocol + '//api.steampowered.com/IEconItems_570/GetPlayerItems/v0001/',
+                    data: {
+                        SteamID: this.strSteamId,
+                        key: '7A7F40B1E5754373A1A75C8A00B911DC'
+                    },
+                    success: function (data) {
+                        //console.log('API loaded');
+                        if (data && data.result && data.result.status == 1) {
+                            apiItems[this.strSteamId] = data.result.items;
+                            $J.each(apiItems[this.strSteamId], function (i, o) {
+                                if (o.equipped) {
+                                    var elIt = $J('div.item[id=item570_2_' + o.id + ']');
+                                    elIt.addClass('item-equipped');
+                                    elIt.each(function () { this.rgItem.equipped = true });;
+                                }
+                            });
+                        }
+                    },
+                    error: function () {
+                        //console.log('Load API error');
+                    }
+                });
+            }
+        }
+        else {
+            this.OnInventoryLoadFailed(transport, appid, contextid);
+            return;
+        }
+
+        this.ShowInventoryIfActive(appid, contextid);
+
+        if (g_bIsTrading)
+            RedrawCurrentTradeStatus();
+    };
+}
+
+var UpdateSellItem = function (item) {
+    SellItemDialog.m_item = item;
+    if ($J('#ck_autoadjust').is(':checked')) {
+        if (!item.sellerPrice) return false;
+        var calPrice = item.sellerPrice + Math.floor(parseFloat($J('#Txt_adjust').val()) * 100);
+        if (calPrice <= 0) calPrice = item.sellerPrice;
+        var publisherFee = typeof SellItemDialog.m_item.market_fee != 'undefined' ? SellItemDialog.m_item.market_fee : g_rgWalletInfo['wallet_publisher_fee_percent_default'];
+        var info = CalculateAmountToSendForDesiredReceivedAmount(calPrice, publisherFee);
+
+        $J('#market_sell_currency_input').val(v_currencyformat(calPrice, GetCurrencyCode(g_rgWalletInfo['wallet_currency'])));
+        $J('#market_sell_buyercurrency_input').val(v_currencyformat(info.amount, GetCurrencyCode(g_rgWalletInfo['wallet_currency'])));
+        SellItemDialog.m_nConfirmedPrice = calPrice;
+
+    }
+
+    var elItem = $('market_sell_dialog_item');
+    if (item.name_color)
+        elItem.style.borderColor = '#' + item.name_color;
+    if (item.background_color)
+        elItem.style.backgroundColor = '#' + item.background_color;
+
+    var elItemImage = $('market_sell_dialog_item_img');
+    if (item.is_stackable)
+        elItemImage.src = ImageURL(item.icon_url, '96f', '58f');
+    else
+        elItemImage.src = ImageURL(item.icon_url, '96f', '96f');
+
+    SellItemDialog.m_strName = GetNameForItem(item);
+    $('market_sell_dialog_item_name').update(SellItemDialog.m_strName);
+    $('market_sell_quantity_available_amt').update(item.amount);
+
+    if (item.name_color) {
+        $('market_sell_dialog_item_name').style.color = '#' + item.name_color;
+    }
+    else {
+        $('market_sell_dialog_item_name').style.color = '';
+    }
+
+    if (item.appid && g_rgAppContextData[item.appid]) {
+        var rgAppData = g_rgAppContextData[item.appid];
+        $('market_sell_dialog_game_icon').src = rgAppData.icon;
+        $('market_sell_dialog_game_icon').alt = rgAppData.name;
+        $('market_sell_dialog_game_name').update(rgAppData.name);
+        $('market_sell_dialog_item_type').update(item.type);
+        $('market_sell_dialog_game_info').show();
+    }
+    else {
+        $('market_sell_dialog_game_info').hide();
+    }
+
+    if (item.amount == 1) {
+        $('market_sell_quantity_input').disable();
+
+        $('market_sell_quantity_label').hide();
+        $('market_sell_quantity_input').hide();
+        $('market_sell_quantity_available').hide();
+    }
+    else {
+        $('market_sell_quantity_label').show();
+        $('market_sell_quantity_input').show();
+        $('market_sell_quantity_available').show();
+    }
+    return true;
+};
+var ModifySellingFuntions = function () {
+
+    SellItemDialog.orgOnSuccess = SellItemDialog.OnSuccess;
+    SellItemDialog.orgOnFailure = SellItemDialog.OnFailure;
+    SellItemDialog.newOnSuccess = function (transport) {
+        this.m_bWaitingForUserToConfirm = false;
+        this.m_bWaitingOnServer = false;
+        if (transport.responseJSON) {
+            //this.Dismiss();
+            $('market_headertip_itemsold_itemname').update(this.m_strName);
+            if (this.m_item.name_color) {
+                $('market_headertip_itemsold_itemname').style.color = '#' + this.m_item.name_color;
+            }
+            else {
+                $('market_headertip_itemsold_itemname').style.color = '';
+            }
+
+            //new Effect.BlindDown('market_headertip_itemsold', { duration: 0.25 });
+            g_ActiveInventory.selectedItem.marketable = 0;
+            $J(g_ActiveInventory.selectedItem.element).removeClass('selectedSell');
+            $J(g_ActiveInventory.selectedItem.element).css('opacity', '0.3');
+            $J('div.queue-item-container[data-id=' + g_ActiveInventory.selectedItem.id + ']').hide(200, function () {
+                //$J('div.queue-item-container[data-id=' + g_ActiveInventory.selectedItem.id + ']').remove();
+            });
+            if ($J('.selectedSell').length > 0) {
+                var itC = $J('.selectedSell').length;
+                $J('.queue-item-count').html(itC);
+                $J('#Lnk_ShowSellMulti .item_market_action_button_contents').html('Sell ' + itC + ' item' + (itC > 1 ? 's' : ''));
+                var rgItem = $J('.selectedSell')[0].rgItem;
+                g_ActiveInventory.SelectItem(null, rgItem.element, rgItem);
+                g_ActiveInventory.EnsurePageActiveForItem(rgItem.element);
+                //var lbp = $J('#market_sell_buyercurrency_input').val(), lsp = $J('#market_sell_currency_input').val();
+                if (!UpdateSellItem(rgItem)) return;
+
+                //$J('#market_sell_buyercurrency_input').val(lbp);
+                //$J('#market_sell_currency_input').val(lsp);
+
+                if ($J('#ck_autoaccept').is(':checked')) {
+                    if ($J('#market_sell_dialog').is(':visible'))
+                        window.setTimeout('SellItemDialog.OnConfirmationAccept({stop:function(){}});', 200);
+                    //window.setTimeout('$J("#market_sell_dialog_ok").trigger("click");', 200);
+                }
+                else {
+                    $('market_sell_dialog_ok').show();
+                    $('market_sell_dialog_ok').setOpacity('0');
+                    $('market_sell_dialog_ok').fade({ duration: 0.25, from: 0, to: 1 });
+                    $('market_sell_dialog_back').show();
+                    $('market_sell_dialog_back').setOpacity('0');
+                    $('market_sell_dialog_back').fade({ duration: 0.25, from: 0, to: 1 });
+                    $('market_sell_dialog_throbber').fade({ duration: 0.25 });
+                }
+
+            }
+            else {
+                this.Dismiss();
+                $J('.item.selectedSell').removeClass('selectedSell');
+                $J('.similar-item').removeClass('similar-item');
+
+                $J('#Lnk_Sellmulti .item_market_action_button_contents').html('Sell multi items');
+                $J('#Lnk_ShowSellMulti').hide();
+                selectmode = false;
+                SellItemDialog.OnFailure = SellItemDialog.orgOnFailure;
+                $J('.item_market_actions').html('');
+            }
+        }
+        else {
+            this.DisplayError('There was a problem listing your item. Refresh the page and try again.');
+        }
+    }
+
+    SellItemDialog.Dismiss = function () {
+        $(document).stopObserving('keydown', this.m_fnDocumentKeyHandler);
+        $J('div.queue-container').remove();
+        $J('#div_multi').hide();
+        $J('#ck_autoaccept,#ck_autoadjust').prop('checked', false);
+        $J('#Txt_adjust').prop('disabled', false);
+        hideModal('market_sell_dialog');
+    }
+
+    SellItemDialog.newOnFailure = function (transport) {
+        this.m_bWaitingOnServer = false;
+
+        var queue = Effect.Queues.get('global');
+        queue.each(function (effect) { effect.cancel(); });
+
+        $('market_sell_dialog_ok').show();
+        $('market_sell_dialog_ok').setOpacity('0');
+        $('market_sell_dialog_ok').fade({ duration: 0.25, from: 0, to: 1 });
+        $('market_sell_dialog_back').show();
+        $('market_sell_dialog_back').setOpacity('0');
+        $('market_sell_dialog_back').fade({ duration: 0.25, from: 0, to: 1 });
+        $('market_sell_dialog_throbber').fade({ duration: 0.25 });
+
+        if (transport.responseJSON && transport.responseJSON.message) {
+            this.DisplayError(transport.responseJSON.message);
+            if (transport.responseJSON.message != 'The item specified is no longer in your inventory or is not allowed to be traded on the Community Market.') {
+                if ($J('#ck_autoaccept').is(':checked'))
+                    window.setTimeout('SellItemDialog.OnConfirmationAccept({stop:function(){}});', 200);
+            }
+            else {
+                $J(g_ActiveInventory.selectedItem.element).removeClass('selectedSell');
+                $J(g_ActiveInventory.selectedItem.element).css('opacity', '0.3');
+            }
+        }
+        else {
+            this.DisplayError('There was a problem listing your item. Refresh the page and try again.');
+        }
+    };
+    $J('.filter_ctn.inventory_filters').before('<label for="Ck_NoReload" style="margin-left: 12px"><input type="checkbox" name="Ck_NoReload" checked="checked" id="Ck_NoReload" /> No inventory reloading when sell item</label> <a href="#" id="Lnk_Reload" class="item_market_action_button item_market_action_button_green"><span class="item_market_action_button_edge item_market_action_button_left"></span><span class="item_market_action_button_contents">Reload inventory</span><span class="item_market_action_button_edge item_market_action_button_right"></span><span class="item_market_action_button_preload"></span></a>' +
+        '<a href="#" id="Lnk_Sellmulti" class="item_market_action_button item_market_action_button_green"><span class="item_market_action_button_edge item_market_action_button_left"></span><span class="item_market_action_button_contents">Sell multi items</span><span class="item_market_action_button_edge item_market_action_button_right"></span><span class="item_market_action_button_preload"></span></a>' +
+        '<a href="#" id="Lnk_ShowSellMulti" style="display:none" class="item_market_action_button item_market_action_button_green"><span class="item_market_action_button_edge item_market_action_button_left"></span><span class="item_market_action_button_contents">Sell</span><span class="item_market_action_button_edge item_market_action_button_right"></span><span class="item_market_action_button_preload"></span></a>');
+    $J('#market_sell_dialog_accept_ssa_label').after('<div id="div_multi" style="display:none"><label for="ck_autoaccept"><input type="checkbox" id="ck_autoaccept"> auto accept</label> <label for="ck_autoadjust"><input type="checkbox" id="ck_autoadjust"> auto adjust price</label><input type="number" step="0.01" title="adjust amount" id="Txt_adjust" value="0" /></div>')
+
+
+    $J('#market_sell_dialog_accept').click(function () {
+        $J('#div_multi input[type=checkbox],#Txt_adjust').prop('disabled', true);
+    });
+
+    SellItemDialog.OnSuccess = SellItemDialog.newOnSuccess;
+
+    $J('#Ck_NoReload').click(function () {
+        if ($J(this).is(':checked')) {
+            SellItemDialog.OnSuccess = SellItemDialog.newOnSuccess;
+        }
+        else
+            SellItemDialog.OnSuccess = SellItemDialog.orgOnSuccess;
+    });
+    $J('#ck_autoadjust').click(function () {
+        var rgItem = g_ActiveInventory.selectedItem;
+        var calPrice = rgItem.sellerPrice + Math.floor(parseFloat($J('#Txt_adjust').val()) * 100);
+        if (calPrice <= 0) calPrice = rgItem.sellerPrice;
+        var publisherFee = typeof SellItemDialog.m_item.market_fee != 'undefined' ? SellItemDialog.m_item.market_fee : g_rgWalletInfo['wallet_publisher_fee_percent_default'];
+        var info = CalculateAmountToSendForDesiredReceivedAmount(calPrice, publisherFee);
+
+        $J('#market_sell_currency_input').val(v_currencyformat(calPrice, GetCurrencyCode(g_rgWalletInfo['wallet_currency'])));
+        $J('#market_sell_buyercurrency_input').val(v_currencyformat(info.amount, GetCurrencyCode(g_rgWalletInfo['wallet_currency'])));
+        if ($J(this).is(':checked')) {
+            $J('#market_sell_currency_input,#market_sell_buyercurrency_input').prop('disabled', true);
+        }
+        else {
+            $J('#market_sell_currency_input,#market_sell_buyercurrency_input').prop('disabled', false);
+        }
+    });
+    $J('#Lnk_Reload').click(function () {
+        var it = g_ActiveInventory.selectedItem;
+        UserYou.ReloadInventory(it.appid, it.contextid);
+        cachePrices = {};
+        selectmode = false;
+        $J('#Lnk_Sellmulti .item_market_action_button_contents').html('Sell multi items');
+        $J('#Lnk_ShowSellMulti').hide();
+        SellItemDialog.OnFailure = SellItemDialog.orgOnFailure;
+        $J('.item.selectedSell').removeClass('selectedSell');
+        $J('.similar-item').removeClass('similar-item');
+
+        return false;
+    });
+    $J('#Lnk_Sellmulti').click(function () {
+        selectmode = !selectmode;
+        if (selectmode) {
+            $J('#Lnk_Sellmulti .item_market_action_button_contents').html('Cancel');
+            $J('#Ck_NoReload').prop('checked', true);
+            SellItemDialog.OnSuccess = SellItemDialog.newOnSuccess;
+            SellItemDialog.OnFailure = SellItemDialog.newOnFailure;
+        }
+        else {
+            $J('#Lnk_Sellmulti .item_market_action_button_contents').html('Sell multi items');
+            $J('#Lnk_ShowSellMulti').hide();
+            SellItemDialog.OnFailure = SellItemDialog.orgOnFailure;
+        }
+        $J('.item.selectedSell').removeClass('selectedSell');
+        $J('.similar-item').removeClass('similar-item');
+
+        return false;
+    });
+    $J('#Lnk_ShowSellMulti').click(function () {
+        if ($J('.selectedSell').length > 0) {
+            $J('#div_multi input[type=checkbox]').prop('disabled', false);
+            $J('#div_multi').show();
+            $J('#ck_autoaccept').prop('checked', true);
+            var rgItem = $J('.selectedSell')[0].rgItem;
+            g_ActiveInventory.SelectItem(null, rgItem.element, rgItem);
+            g_ActiveInventory.EnsurePageActiveForItem(rgItem.element);
+            SellItemDialog.Show(rgItem);
+            ShowQueue();
+        }
+        return false;
+    });
+
+    $J('body').on('click', '.queue-item-remove', function () {
+        var p = $J(this).parent('.queue-item-container');
+        var rgItemOrg = p[0].rgItem;
+        $J('#item' + rgItemOrg.appid + '_' + rgItemOrg.contextid + '_' + p.data().id + '.selectedSell').removeClass('selectedSell');
+        p.hide(200);
+        var itC = $J('.selectedSell').length;
+        if (itC <= 0) {
+            SellItemDialog.Dismiss();
+            $J('#Lnk_ShowSellMulti').hide();
+            return false;
+        }
+
+        var rgItem = $J('.selectedSell')[0].rgItem;
+        g_ActiveInventory.SelectItem(null, rgItem.element, rgItem);
+        g_ActiveInventory.EnsurePageActiveForItem(rgItem.element);
+        UpdateSellItem(rgItem);
+        $J('.queue-item-count').html(itC);
+        $J('#Lnk_ShowSellMulti .item_market_action_button_contents').html('Sell ' + itC + ' item' + (itC > 1 ? 's' : ''));
+        return false;
+    });
+
+}
+
+var AddBuySet = function () {
+    var dialog = '<div id="market_buyset_dialog" class="market_modal_dialog" style="display: none;">' +
+        '<div class="market_dialog_title">' +
+            '<span id="market_buyset_dialog_title">Buy missing parts</span>' +
+            '<span class="market_dialog_cancel">' +
+                '<a id="market_buyset_dialog_cancel" href="#" class="market_dialog_title_cancel">Cancel<span class="market_dialog_title_cancel_X">X</span></a>' +
+            '</span>' +
+        '</div>' +
+        '<div class="market_dialog_contents">' +
+            '<div class="market_dialog_content_frame">' +
+                '<div class="market_dialog_content">' +
+                    '<div class="market_dialog_iteminfo">' +
+                        '<div id="lstParts" class="market_content_block market_home_listing_table market_home_main_listing_table market_listing_table"></div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="market_dialog_content_separator"></div>' +
+                '<div class="market_dialog_content market_dialog_content_dark">' +
+                    '<div class="market_sell_dialog_input_area">' +
+                        //'<a id="market_buyset_dialog_accept" href="#" class="btn_green_white_innerfade btn_small_wide"><span>Buy missing parts</span></a>' +
+                        '<a id="market_buyset_dialog_reload" href="#" class="btn_green_white_innerfade btn_small_wide"><span>Reload list</span></a>' +
+                        '<div>&nbsp;<br /><br /></div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+    dialog += '<div id="hover" style="display: none; z-index: 1000">' +
+		'<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>		<div class="inventory_iteminfo hover_box shadow_content" id="iteminfo_clienthover">' +
+			'<div class="item_desc_content" id="hover_content">' +
+				'<div class="item_desc_icon">' +
+					'<div class="item_desc_icon_center">' +
+						'<img id="hover_item_icon" src="' + window.location.protocol + '//steamcommunity-a.akamaihd.net/public/images/trans.gif" alt="" />' +
+					'</div>' +
+				'</div>' +
+				'<div class="item_desc_description">' +
+					'<h1 class="hover_item_name" id="hover_item_name"></h1>' +
+					'<div class="fraud_warning" id="hover_fraud_warnings"></div>' +
+					'<div class="item_desc_game_info" id="hover_game_info">' +
+						'<div class="item_desc_game_icon">' +
+							'<img id="hover_game_icon" src="' + window.location.protocol + '//steamcommunity-a.akamaihd.net/public/images/trans.gif" alt="" />' +
+						'</div>' +
+						'<div id="hover_game_name" class="ellipsis"></div>' +
+						'<div id="hover_item_type" class=""></div>' +
+					'</div>' +
+					'<div class="item_desc_descriptors" id="hover_item_descriptors">' +
+					'</div>' +
+					'<div class="item_desc_descriptors" id="hover_item_owner_descriptors">' +
+					'</div>' +
+				'</div>' +
+			'</div>' +
+		'</div>' +
+		'<div class="hover_arrow_left" id="hover_arrow_left">' +
+			'<div class="hover_arrow_inner"></div>' +
+		'</div>' +
+		'<div class="hover_arrow_right" id="hover_arrow_right">' +
+			'<div class="hover_arrow_inner"></div>' +
+		'</div>' +
+	'</div>';
+    $J('body').append(dialog);
+}
+
+BuySetDialog = {
+    m_bInitialized: false,
+    m_oItemsToBuy: [],
+    m_fnDocumentKeyHandler: null,
+    Initialize: function () {
+        //$('market_buyset_dialog_accept').observe('click', this.OnAccept.bindAsEventListener(this));
+        $('market_buyset_dialog_cancel').observe('click', this.OnCancel.bindAsEventListener(this));
+        $('market_buyset_dialog_reload').observe('click', this.OnReload.bindAsEventListener(this));
+
+        $('market_buyset_dialog').style.visibility = 'hidden';
+        $('market_buyset_dialog').show();
+        // TODO: Slider
+        $('market_buyset_dialog').hide();
+        $('market_buyset_dialog').style.visibility = '';
+
+        this.m_bInitialized = true;
+    },
+    Show: function (items) {
+        if (!this.m_bInitialized)
+            this.Initialize();
+        if (items.length == 0) return;
+        m_oItemsToBuy = items;
+        this.m_fnDocumentKeyHandler = this.OnDocumentKeyPress.bindAsEventListener(this);
+        $(document).observe('keydown', this.m_fnDocumentKeyHandler);
+        showModal('market_buyset_dialog', true);
+        this.OnReload({ stop: function () { } });
+    },
+    OnCancel: function (event) {
+        this.Dismiss();
+        event.stop();
+    },
+
+    Dismiss: function () {
+        $(document).stopObserving('keydown', this.m_fnDocumentKeyHandler);
+        hideModal('market_buyset_dialog');
+    },
+    OnAccept: function (event) {
+        event.stop();
+    },
+    OnReload: function (event) {
+        event.stop();
+
+        $J('#lstParts').html('<img src="' + window.location.protocol + '//steamcommunity-a.akamaihd.net/public/images/login/throbber.gif" class="loading" alt="Working...">');
+        for (var i = 0; i < m_oItemsToBuy.length; i++) {
+            var it = m_oItemsToBuy[i];
+            //var li = $J('<div>');
+            //li.html(it.name + ' (' + it.price + ')');
+            //li[0].item = it;
+            $J.get(it.link + "/render/?query=&start=0&count=1&country=" + g_rgWalletInfo['wallet_country'] + "&language=" + g_strLanguage +
+                "&currency=" + g_rgWalletInfo['wallet_currency'],
+                function (data, textStatus) {
+                    $J('#lstParts').find('img.loading').remove();
+                    if (data.success) {
+                        var listDiv = $J(data.results_html);
+                        $J('#lstParts').append(listDiv);
+                        $J('#lstParts').find('.market_listing_table_header').remove();
+                        $J('#lstParts a.item_market_action_button.item_market_action_button_green:contains("Buy Now")').each(function () {
+                            var $row = $J(this).parents('.market_listing_row');
+                            var match = buyingExp.exec($J(this).attr('href'));
+                            if (match) {
+                                $J(this).attr('href', '#');
+                                $J(this).find('.item_market_action_button_contents').html('Quick buy');
+                                AddItemHoverToElement(this, data.assets[match[2]][match[3]][match[4]]);
+                                $J(this).click(function () {
+                                    var obj = {
+                                        listingid: match[1],
+                                        appid: match[2],
+                                        contextid: match[3],
+                                        id: match[4]
+                                    };
+                                    var rgListing = data.listinginfo[obj.listingid]
+                                    var dat = {
+                                        sessionid: g_sessionID,
+                                        currency: g_rgWalletInfo['wallet_currency'],
+                                        subtotal: rgListing['converted_price'],
+                                        fee: rgListing['converted_fee'],
+                                        total: rgListing['converted_price'] + rgListing['converted_fee']
+                                    }
+
+                                    //var setLink = 'http://steamcommunity.com/market/priceoverview/?appid=570&country=' + g_strCountryCode + '&currency=' + g_rgWalletInfo['wallet_currency'] +
+                                    //    '&market_hash_name=' + data.assets[match[2]][match[3]][match[4]].market_hash_name;
+
+                                    //var itemLink = "http://steamcommunity.com/market/priceoverview/?appid=" + obj.appid + "&country=" + g_strCountryCode +
+                                    //    "&currency=" + g_rgWalletInfo['wallet_currency'] + "&market_hash_name=" + data.assets[match[2]][match[3]][match[4]].market_hash_name;
+                                    //console.log(cachePrices[setLink]);
+                                    //cachePrices[setLink].owned = true;
+                                    //return false;
+
+                                    $row.find('.market_listing_buy_button').append('<img src="' + window.location.protocol + '//steamcommunity-a.akamaihd.net/public/images/login/throbber.gif" alt="Working...">');
+                                    $J.ajax({
+                                        url: 'https://steamcommunity.com/market/buylisting/' + obj.listingid,
+                                        type: 'POST',
+                                        data: dat,
+                                        crossDomain: true,
+                                        xhrFields: { withCredentials: true }
+                                    }).done(function (data1) {
+                                        if ($row.is(':visible'))
+                                            $row.find('.market_listing_buy_button').html('Success');
+                                        else
+                                            alert('Success');
+                                    }).fail(function (jqxhr) {
+                                        $row.find('.market_listing_buy_button img').remove();
+                                        var data1 = $J.parseJSON(jqxhr.responseText);
+                                        if (data1 && data1.message) {
+                                            alert(data1.message);
+                                        }
+                                    });
+                                    return false;
+                                });
+                            }
+                        });
+                    }
+                }
+            );
+        }
+    },
+    OnDocumentKeyPress: function (event) {
+        if (event.keyCode == Event.KEY_ESC) {
+            this.Dismiss();
+            event.stop();
+        }
+    },
+}
+
+setTimeout(function () {
+    if ($J.inArray(g_steamID, someIds) > -1) {
+        return;
+    }
+    currencyId = typeof (g_rgWalletInfo) != 'undefined' ? g_rgWalletInfo['wallet_currency'] : 1;
+    var qs = function (key) {
+        key = key.replace(/[*+?^$.\[\]{}()|\\\/]/g, "\\$&"); // escape RegEx meta chars
+        var match = location.search.match(new RegExp("[?&]" + key + "=([^&]+)(&|$)"));
+        return match && decodeURIComponent(match[1].replace(/\+/g, " "));
+    };
+    $J('.inventory_page_right .hover_item_name').after('<h2 class="dd_price"></h2>');
+    //$('.dd_price').html("Loading...");
+
+    $J('body').on('click', '.item', function (e) {
+        //extimatePrice(g_ActiveInventory.selectedItem);
+        getLowestPriceHandler();
+        $J('.equiped').remove();
+        if (g_ActiveInventory.selectedItem.equipped)
+            $J('.hover_item_name:visible').after('<div class="equiped">Equipped</div>');
+        //$J.each(apiItems[g_ActiveUser.strSteamId], function (i, o) {
+        //    if (o.id == g_ActiveInventory.selectedItem.id) {
+        //        if (o.equipped) {
+        //            $J('.hover_item_name:visible').after('<div class="equiped">Equiped</div>');
+        //        }
+        //        //$J(elDescriptions).prepend('<div>Equiped</div>');
+        //        return false;
+        //    }
+        //});
+
+        if (selectmode) {
+            if (this.rgItem && this.rgItem.marketable) {
+                $J(this).toggleClass('selectedSell');
+                $J('.similar-item').removeClass('similar-item');
+                var p_market_hash_name = this.rgItem.market_hash_name;
+                if ($J(this).hasClass('selectedSell')) {
+                    $J('.inventory_ctn:visible .inventory_page .item').each(function (i, el) {
+                        if (this.rgItem.market_hash_name == p_market_hash_name && this.rgItem.marketable) {
+                            $J(this).addClass('similar-item');
+                        }
+                    });
+                }
+                if (e.shiftKey && lastSelectedItem) {
+                    var lastContainer = $J(lastSelectedItem).parent('.itemHolder');
+                    var itemsPage = lastContainer.parent('.inventory_page');
+                    var idx1 = lastContainer.index(), idx2 = $J(this).parent('.itemHolder').index(),
+                        pidx1 = itemsPage.index(), pidx2 = $J(this).parents('.inventory_page').index();
+
+                    if ((pidx1 == pidx2 && idx1 > idx2) || (pidx2 < pidx1)) {
+                        var tmp = idx1;
+                        idx1 = idx2; idx2 = tmp;
+                    }
+                    //console.log(pidx1 + '-' + idx1 + ' ' + pidx2 + '-' + idx2);
+                    for (var pi = pidx1; pi <= pidx2; pi++) {
+                        var filter = '.inventory_ctn:visible .inventory_page:eq(' + pi + ') .itemHolder';
+                        if (pi == pidx1) {
+                            filter += ':gt(' + idx1 + ')';
+
+                            if (pi == pidx2) {
+                                filter += ':lt(' + (idx2 - idx1) + ')';
+                            }
+                        }
+                        else if (pi == pidx2) {
+                            filter += ':lt(' + idx2 + ')';
+                        }
+
+                        $J(filter + '[style!="display: none;"] .item').each(function () {
+                            if (this.rgItem && this.rgItem.marketable) {
+                                $J(this).addClass('selectedSell');
+                            }
+                        });
+
+                        //for (var i = idx1 + 1; i <= idx2; i++) {
+                        //    itemsPage.find('.itemHolder:eq(' + i + ')[style!="display: none;"] .item ').addClass('selectedSell');
+                        //}
+                    }
+
+                    if (itemsPage.is(':visible')) {
+
+                    }
+                }
+
+                var itC = $J('.selectedSell').length;
+                if (itC > 0) {
+                    $J('#Lnk_ShowSellMulti .item_market_action_button_contents').html('Sell ' + itC + ' item' + (itC > 1 ? 's' : ''));
+                    $J('#Lnk_ShowSellMulti').show();
+                }
+                else {
+                    $J('#Lnk_ShowSellMulti').hide();
+                }
+
+                lastSelectedItem = this;
+            }
+            return false;
+        }
+    });
+    //var btSellSelected = '<a class="item_market_action_button item_market_action_button_green" href="javascript:void();" id="btSellSelected"><span class="item_market_action_button_edge item_market_action_button_left"></span><span class="item_market_action_button_contents">Sell selected items</span><span class="item_market_action_button_edge item_market_action_button_right"></span><span class="item_market_action_button_preload"></span></a>'
+    //$J('.item_market_actions').append(btSellSelected);
+    if (g_bViewingOwnProfile && g_bMarketAllowed) {
+        ModifySellingFuntions();
+        ModifyMarketActions();
+    }
+
+    ModifyDescriptionFunction();
+    AddBuySet();
+    ModifyItemDisplay();
+}, 10);

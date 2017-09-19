@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dota 2 lounge auto bump & Steam notify Options</title>
+    <script src="../js/jquery/jquery-1.10.2.min.js"></script>
+</head>
+<body>
+    Notification sound:
+    <select id="cb_sound">
+        <option value="">none</option>
+        <option value="coins.wav">Dota 2 coin</option>
+        <option value="offersound.mp3">Chime 1</option>
+        <option value="nof.mp3">Chime 2</option>
+        <option value="Communication-channel.mp3">Communication</option>
+        <option value="Gets-in-the-way.mp3">Get in the way</option>
+        <option value="Just-like-magic.mp3">Just like magic</option>
+        <option value="Isnt-it.mp3">Isn't it</option>
+        <option value="System-fault.mp3">System fault</option>
+    </select>
+    <div id="status"></div>
+    <script src="../js/options.js"></script>
+</body>
+</html>
